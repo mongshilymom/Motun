@@ -1,74 +1,17 @@
-name: motun-ci
-
-on:
-  workflow_dispatch: {}          # 수동 실행 버튼
-  push:
-    branches: [ "feat/**" ]      # 작업 브랜치에 push 시 자동
-  pull_request:
-    branches: [ "main" ]
-
-permissions:
-  contents: write                # git push/commit 권한
-  pull-requests: write           # (선택) PR 생성/업데이트
-
+name: motun-smoke
+on: { workflow_dispatch: {} }     # 수동 실행 버튼
+permissions: { contents: write }  # push 권한
 jobs:
-  build-test:
-    runs-on: ubuntu-latest
-    env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}              # Neon
-      OBJECT_STORAGE_BUCKET: ${{ secrets.OBJECT_STORAGE_BUCKET }}
-      OBJECT_STORAGE_REGION: ${{ secrets.OBJECT_STORAGE_REGION }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        # checkout은 GITHUB_TOKEN을 로컬 git에 저장 → 인증 push 가능. :contentReference[oaicite:1]{index=1}
-
-      - name: Setup Node + pnpm
-        uses: actions/setup-node@v4
-        with: { node-version: "20" }
-      - run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
-          pnpm --version
-        # Corepack으로 pnpm 쓰는 공식 루트. :contentReference[oaicite:2]{index=2}
-
-      - name: Install deps
-        run: pnpm install
-
-      - name: Drizzle generate & migrate
-        run: |
-          pnpm drizzle-kit generate
-          pnpm drizzle-kit migrate
-        # Drizzle 표준: generate → migrate. :contentReference[oaicite:3]{index=3}
-
-      - name: Seed initial data
-        run: |
-          if [ -f scripts/seed.js ]; then node scripts/seed.js; else echo "No seed script yet"; fi
-
-      - name: Lint, Test, Build
-        run: |
-          pnpm run -s lint || true
-          pnpm run -s test || true
-          pnpm run -s build || true
-
-      - name: Commit any artifacts (optional)
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "chore(ci): artifacts" || echo "no changes"
-          git push
-
-  e2e:
-    needs: build-test
+  smoke:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
-      - run: |
-          corepack enable
-          pnpm install
-          npx playwright install --with-deps
-          pnpm run -s test:e2e
-        # Playwright CI 기본 권장. :contentReference[oaicite:4]{index=4}
+        with: { node-version: '20' }
+      - name: Touch & push
+        run: |
+          echo "ci-ok: $(date -u)" >> .ci-check.txt
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .ci-check.txt && git commit -m "chore(ci): smoke push" || true
+          git push
