@@ -1,0 +1,3 @@
+permissions:
+  contents: write         # push/commit
+  pull-requests: write    # PR 열기/업데이트
